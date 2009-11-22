@@ -129,7 +129,7 @@ class SlicehostNodeDriver(NodeDriver):
     def _to_node(self, element):
 
         attrs = [ 'name', 'image-id', 'progress', 'id', 'bw-out', 'bw-in', 
-                  'flavor-id', 'status', 'ip-address' ]
+                  'flavor-id', 'status', 'ip-address', 'root-password' ]
 
         node_attrs = {}
         for attr in attrs:
@@ -161,7 +161,12 @@ class SlicehostNodeDriver(NodeDriver):
                  state=state,
                  public_ip=public_ip,
                  private_ip=private_ip,
-                 driver=self.connection.driver)
+                 driver=self.connection.driver,
+                 extra={
+                    'password': element.findtext('root-password'),
+                    'bw-in': element.findtext('bw-in'),
+                    'bw-out': element.findtext('bw-out'),
+                 })
         return n
 
     def _to_sizes(self, object):
