@@ -47,8 +47,8 @@ class RackspaceTests(unittest.TestCase, TestCaseMixin):
         ret = self.driver.list_nodes()
         self.assertEqual(len(ret), 1)
         node = ret[0]
-        self.assertTrue(node.public_ip[0])
-        self.assertTrue(node.private_ip[0])
+        self.assertEqual('67.23.21.33', node.public_ip[0])
+        self.assertEqual('10.176.168.218', node.private_ip[0])
         self.assertEqual(node.extra.get('flavorId'), '1')
         self.assertEqual(node.extra.get('imageId'), '11')
 
@@ -60,6 +60,8 @@ class RackspaceTests(unittest.TestCase, TestCaseMixin):
 
     def test_list_images(self):
         ret = self.driver.list_images()
+        self.assertEqual(ret[10].extra['serverId'], None)
+        self.assertEqual(ret[11].extra['serverId'], '91221')
 
     def test_create_node(self):
         image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver)
@@ -67,6 +69,17 @@ class RackspaceTests(unittest.TestCase, TestCaseMixin):
         node = self.driver.create_node('racktest', image, size)
         self.assertEqual(node.name, 'racktest')
         self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')
+
+    def test_create_node_with_metadata(self):
+        RackspaceMockHttp.type = 'METADATA'
+        image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver)
+        size = NodeSize(1, '256 slice', None, None, None, None, driver=self.driver)
+        metadata = { 'a': 'b', 'c': 'd' }
+        files = { '/file1': 'content1', '/file2': 'content2' }
+        node = self.driver.create_node('racktest', image, size, metadata=metadata, files=files)
+        self.assertEqual(node.name, 'racktest')
+        self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')
+        self.assertEqual(node.extra.get('metadata'), metadata)
 
     def test_reboot_node(self):
         node = Node(id=72258, name=None, state=None, public_ip=None, private_ip=None,
@@ -107,11 +120,15 @@ class RackspaceMockHttp(MockHttp):
         return (httplib.OK, body, {}, httplib.responses[httplib.OK])
 
     def _v1_0_slug_images_detail(self, method, url, body, headers):
-        body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><images xmlns="http://docs.rackspacecloud.com/servers/api/v1.0"><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="CentOS 5.2" id="2"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Gentoo 2008.0" id="3"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Debian 5.0 (lenny)" id="4"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Fedora 10 (Cambridge)" id="5"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="CentOS 5.3" id="7"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 9.04 (jaunty)" id="8"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Arch 2009.02" id="9"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 8.04.2 LTS (hardy)" id="10"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 8.10 (intrepid)" id="11"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Red Hat EL 5.3" id="12"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Fedora 11 (Leonidas)" id="13"/></images>"""
+        body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><images xmlns="http://docs.rackspacecloud.com/servers/api/v1.0"><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="CentOS 5.2" id="2"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Gentoo 2008.0" id="3"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Debian 5.0 (lenny)" id="4"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Fedora 10 (Cambridge)" id="5"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="CentOS 5.3" id="7"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 9.04 (jaunty)" id="8"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Arch 2009.02" id="9"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 8.04.2 LTS (hardy)" id="10"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Ubuntu 8.10 (intrepid)" id="11"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Red Hat EL 5.3" id="12"/><image status="ACTIVE" created="2009-07-20T09:14:37-05:00" updated="2009-07-20T09:14:37-05:00" name="Fedora 11 (Leonidas)" id="13"/><image status="ACTIVE" progress="100" created="2009-11-29T20:22:09-06:00" updated="2009-11-29T20:24:08-06:00" serverId="91221" name="daily" id="191234"/></images>"""
         return (httplib.OK, body, {}, httplib.responses[httplib.OK])
         
     def _v1_0_slug_servers(self, method, url, body, headers):
         body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><server xmlns="http://docs.rackspacecloud.com/servers/api/v1.0" status="BUILD" progress="0" hostId="9dd380940fcbe39cb30255ed4664f1f3" flavorId="1" imageId="11" adminPass="racktestvJq7d3" id="72258" name="racktest"><metadata/><addresses><public><ip addr="67.23.21.33"/></public><private><ip addr="10.176.168.218"/></private></addresses></server>"""
+        return (httplib.ACCEPTED, body, {}, httplib.responses[httplib.ACCEPTED])
+
+    def _v1_0_slug_servers_METADATA(self, method, url, body, headers):
+        body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><server xmlns="http://docs.rackspacecloud.com/servers/api/v1.0" status="BUILD" progress="0" hostId="9dd380940fcbe39cb30255ed4664f1f3" flavorId="1" imageId="11" adminPass="racktestvJq7d3" id="72258" name="racktest"><metadata><meta key="a">b</meta><meta key="c">d</meta></metadata><addresses><public><ip addr="67.23.21.33"/></public><private><ip addr="10.176.168.218"/></private></addresses></server>"""
         return (httplib.ACCEPTED, body, {}, httplib.responses[httplib.ACCEPTED])
 
     def _v1_0_slug_servers_72258_action(self, method, url, body, headers):

@@ -18,6 +18,7 @@ from libcloud.interface import INodeDriver
 
 from zope.interface import implements
 
+import base64
 import urlparse
 
 from xml.etree import ElementTree as ET
@@ -141,14 +142,48 @@ class RackspaceNodeDriver(NodeDriver):
         return self.to_images(self.connection.request('/images/detail').object)
 
     def create_node(self, name, image, size, **kwargs):
-        body = """<server   xmlns="%s"
-                            name="%s"
-                            imageId="%s"
-                            flavorId="%s">
-                </server>
-                """ % (NAMESPACE, name, image.id, size.id)
-        resp = self.connection.request("/servers", method='POST', data=body)
+        server_elm = ET.Element(
+            'server',
+            {'xmlns': NAMESPACE,
+             'name': name,
+             'imageId': str(image.id),
+             'flavorId': str(size.id)}
+        )
+
+        metadata_elm = self._metadata_to_xml(kwargs.get("metadata", {}))
+        if metadata_elm:
+            server_elm.append(metadata_elm)
+
+        files_elm = self._files_to_xml(kwargs.get("files", {}))
+        if files_elm:
+            server_elm.append(files_elm)
+
+        resp = self.connection.request("/servers", 
+                                       method='POST', 
+                                       data=ET.tostring(server_elm))
         return self._to_node(resp.object)
+      
+    def _metadata_to_xml(self, metadata):
+        if len(metadata) == 0:
+            return None
+
+        metadata_elm = ET.Element('metadata')
+        for k, v in metadata.items():
+            meta_elm = ET.SubElement(metadata_elm, 'meta', {'key': str(k) })
+            meta_elm.text = str(v)
+
+        return metadata_elm
+  
+    def _files_to_xml(self, files):
+        if len(files) == 0:
+            return None
+
+        personality_elm = ET.Element('personality')
+        for k, v in files.items():
+            file_elm = ET.SubElement(personality_elm, 'file', {'path': str(k) })
+            file_elm.text = base64.b64encode(v)
+
+        return personality_elm
 
     def reboot_node(self, node):
         # TODO: Hard Reboots should be supported too!
@@ -182,11 +217,19 @@ class RackspaceNodeDriver(NodeDriver):
     def _to_node(self, el):
         def get_ips(el):
             return [ip.get('addr') for ip in el]
+          
+        def get_meta_dict(el):
+            d = {}
+            for meta in el:
+                d[meta.get('key')] =  meta.text
+            return d
         
         public_ip = get_ips(self._findall(el, 
                                           'addresses/public/ip'))
         private_ip = get_ips(self._findall(el, 
                                           'addresses/private/ip'))
+        metadata = get_meta_dict(self._findall(el, 'metadata/meta'))
+        
         n = Node(id=el.get('id'),
                  name=el.get('name'),
                  state=el.get('status'),
@@ -198,6 +241,7 @@ class RackspaceNodeDriver(NodeDriver):
                     'hostId': el.get('hostId'),
                     'imageId': el.get('imageId'),
                     'flavorId': el.get('flavorId'),
+                    'metadata': metadata,
                  })
         return n
 
@@ -222,5 +266,6 @@ class RackspaceNodeDriver(NodeDriver):
     def _to_image(self, el):
         i = NodeImage(id=el.get('id'),
                      name=el.get('name'),
-                     driver=self.connection.driver)
+                     driver=self.connection.driver,
+                     extra={'serverId': el.get('serverId')})
         return i
